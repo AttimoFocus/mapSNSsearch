@@ -71,26 +71,57 @@ if (process.env.DATABASE_URL) {
 
 app.get('/api/db_status', async (req, res) => {
   try {
+    const dbUrl = process.env.DATABASE_URL || '';
+    let maskedUrl = '';
+    let parsedHost = '';
+    try {
+      if (dbUrl) {
+        const u = new URL(dbUrl);
+        parsedHost = u.hostname;
+        maskedUrl = `${u.protocol}//${u.username}:****@${u.hostname}${u.pathname}`;
+      }
+    } catch (e) {
+      maskedUrl = `Invalid URL: ${dbUrl.substring(0, 15)}... (${dbUrl.length} chars)`;
+    }
+
     if (dbType === 'postgres') {
       const result = await pgPool.query('SELECT NOW()');
       res.json({
         status: 'healthy',
         dbType,
-        databaseUrlConfigured: !!process.env.DATABASE_URL,
+        databaseUrlConfigured: !!dbUrl,
+        maskedUrl,
+        parsedHost,
         postgresTime: result.rows[0],
       });
     } else {
       res.json({
         status: 'healthy',
         dbType,
-        databaseUrlConfigured: !!process.env.DATABASE_URL,
+        databaseUrlConfigured: !!dbUrl,
+        maskedUrl,
+        parsedHost
       });
     }
   } catch (err) {
+    const dbUrl = process.env.DATABASE_URL || '';
+    let maskedUrl = '';
+    let parsedHost = '';
+    try {
+      if (dbUrl) {
+        const u = new URL(dbUrl);
+        parsedHost = u.hostname;
+        maskedUrl = `${u.protocol}//${u.username}:****@${u.hostname}${u.pathname}`;
+      }
+    } catch (e) {
+      maskedUrl = `Invalid URL: ${dbUrl.substring(0, 15)}... (${dbUrl.length} chars)`;
+    }
     res.status(500).json({
       status: 'error',
       dbType,
-      databaseUrlConfigured: !!process.env.DATABASE_URL,
+      databaseUrlConfigured: !!dbUrl,
+      maskedUrl,
+      parsedHost,
       error: err.message,
     });
   }
