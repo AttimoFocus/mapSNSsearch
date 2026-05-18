@@ -69,6 +69,33 @@ if (process.env.DATABASE_URL) {
   });
 }
 
+app.get('/api/db_status', async (req, res) => {
+  try {
+    if (dbType === 'postgres') {
+      const result = await pgPool.query('SELECT NOW()');
+      res.json({
+        status: 'healthy',
+        dbType,
+        databaseUrlConfigured: !!process.env.DATABASE_URL,
+        postgresTime: result.rows[0],
+      });
+    } else {
+      res.json({
+        status: 'healthy',
+        dbType,
+        databaseUrlConfigured: !!process.env.DATABASE_URL,
+      });
+    }
+  } catch (err) {
+    res.status(500).json({
+      status: 'error',
+      dbType,
+      databaseUrlConfigured: !!process.env.DATABASE_URL,
+      error: err.message,
+    });
+  }
+});
+
 app.post('/api/analyze', async (req, res) => {
   try {
     const { place } = req.body;

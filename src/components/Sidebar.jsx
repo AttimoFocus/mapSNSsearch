@@ -50,7 +50,7 @@ const Sidebar = ({ places, selectedPlace, setSelectedPlace, searchQuery, setSear
       : null;
       
     try {
-      await fetch('/api/saved_places', {
+      const response = await fetch('/api/saved_places', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -64,10 +64,16 @@ const Sidebar = ({ places, selectedPlace, setSelectedPlace, searchQuery, setSear
           status: '未対応'
         })
       });
-      setSavedPlaceIds(prev => new Set([...prev, place.place_id]));
-      fetchSavedPlaces(); // 保存リストの中身も最新にする
+      if (response.ok) {
+        setSavedPlaceIds(prev => new Set([...prev, place.place_id]));
+        fetchSavedPlaces(); // 保存リストの中身も最新にする
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        alert(`保存に失敗しました: ${errorData.error || 'サーバー側のエラーが発生しました。'}`);
+      }
     } catch (e) {
       console.error("Failed to save", e);
+      alert("保存中に通信エラーが発生しました。");
     }
   };
 
