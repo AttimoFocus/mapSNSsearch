@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import sqlite3 from 'sqlite3';
+import pg from 'pg';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -17,12 +18,21 @@ app.use(express.json());
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// Initialize SQLite Database
-const db = new sqlite3.Database('./database.sqlite', (err) => {
-  if (err) {
-    console.error('Error opening database', err.message);
-  } else {
-    db.run(`CREATE TABLE IF NOT EXISTS saved_places (
+// Initialize Database (Cloud PostgreSQL or Local SQLite)
+let dbType = 'sqlite';
+let pgPool = null;
+let db = null;
+
+if (process.env.DATABASE_URL) {
+  dbType = 'postgres';
+  console.log('Connecting to Cloud PostgreSQL...');
+  pgPool = new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false } // Required for Neon/Supabase SSL connections
+  });
+  
+  pgPool.query(`
+    CREATE TABLE IF NOT EXISTS saved_places (
       place_id TEXT PRIMARY KEY,
       name TEXT,
       address TEXT,
@@ -31,10 +41,33 @@ const db = new sqlite3.Database('./database.sqlite', (err) => {
       website TEXT,
       analysis_json TEXT,
       status TEXT DEFAULT '未対応',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-  }
-});
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `).then(() => {
+    console.log('PostgreSQL table verified/created.');
+  }).catch((err) => {
+    console.error('Error creating PostgreSQL table', err.message);
+  });
+} else {
+  console.log('Using Local SQLite Database...');
+  db = new sqlite3.Database('./database.sqlite', (err) => {
+    if (err) {
+      console.error('Error opening database', err.message);
+    } else {
+      db.run(`CREATE TABLE IF NOT EXISTS saved_places (
+        place_id TEXT PRIMARY KEY,
+        name TEXT,
+        address TEXT,
+        rating TEXT,
+        user_ratings_total INTEGER,
+        website TEXT,
+        analysis_json TEXT,
+        status TEXT DEFAULT '未対応',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`);
+    }
+  });
+}
 
 app.post('/api/analyze', async (req, res) => {
   try {
@@ -116,61 +149,109 @@ Webサイト: ${place.website || 'なし'}
 
 // API: 保存済みリストの取得
 app.get('/api/saved_places', (req, res) => {
-  db.all('SELECT * FROM saved_places ORDER BY created_at DESC', [], (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    const places = rows.map(row => ({
-      ...row,
-      analysis: row.analysis_json ? JSON.parse(row.analysis_json) : null
-    }));
-    res.json(places);
-  });
+  if (dbType === 'postgres') {
+    pgPool.query('SELECT * FROM saved_places ORDER BY created_at DESC', (err, result) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      const places = result.rows.map(row => ({
+        ...row,
+        analysis: row.analysis_json ? JSON.parse(row.analysis_json) : null
+      }));
+      res.json(places);
+    });
+  } else {
+    db.all('SELECT * FROM saved_places ORDER BY created_at DESC', [], (err, rows) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      const places = rows.map(row => ({
+        ...row,
+        analysis: row.analysis_json ? JSON.parse(row.analysis_json) : null
+      }));
+      res.json(places);
+    });
+  }
 });
 
 // API: お気に入り保存 / ステータス更新
 app.post('/api/saved_places', (req, res) => {
   const { place_id, name, address, rating, user_ratings_total, website, analysis, status } = req.body;
-  
   const analysis_json = analysis ? JSON.stringify(analysis) : null;
 
-  db.get('SELECT * FROM saved_places WHERE place_id = ?', [place_id], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
+  if (dbType === 'postgres') {
+    pgPool.query('SELECT * FROM saved_places WHERE place_id = $1', [place_id], (err, result) => {
+      if (err) return res.status(500).json({ error: err.message });
+      const row = result.rows[0];
 
-    if (row) {
-      // Update existing
-      const updateStatus = status || row.status;
-      const updateAnalysis = analysis_json || row.analysis_json;
-      db.run(
-        'UPDATE saved_places SET status = ?, analysis_json = ? WHERE place_id = ?',
-        [updateStatus, updateAnalysis, place_id],
-        function(err) {
-          if (err) return res.status(500).json({ error: err.message });
-          res.json({ success: true, place_id, status: updateStatus });
-        }
-      );
-    } else {
-      // Insert new
-      db.run(
-        `INSERT INTO saved_places (place_id, name, address, rating, user_ratings_total, website, analysis_json, status) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [place_id, name, address, rating, user_ratings_total, website, analysis_json, status || '未対応'],
-        function(err) {
-          if (err) return res.status(500).json({ error: err.message });
-          res.json({ success: true, place_id, status: status || '未対応' });
-        }
-      );
-    }
-  });
+      if (row) {
+        const updateStatus = status || row.status;
+        const updateAnalysis = analysis_json || row.analysis_json;
+        pgPool.query(
+          'UPDATE saved_places SET status = $1, analysis_json = $2 WHERE place_id = $3',
+          [updateStatus, updateAnalysis, place_id],
+          (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true, place_id, status: updateStatus });
+          }
+        );
+      } else {
+        pgPool.query(
+          `INSERT INTO saved_places (place_id, name, address, rating, user_ratings_total, website, analysis_json, status) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [place_id, name, address, rating, user_ratings_total, website, analysis_json, status || '未対応'],
+          (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true, place_id, status: status || '未対応' });
+          }
+        );
+      }
+    });
+  } else {
+    db.get('SELECT * FROM saved_places WHERE place_id = ?', [place_id], (err, row) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      if (row) {
+        const updateStatus = status || row.status;
+        const updateAnalysis = analysis_json || row.analysis_json;
+        db.run(
+          'UPDATE saved_places SET status = ?, analysis_json = ? WHERE place_id = ?',
+          [updateStatus, updateAnalysis, place_id],
+          function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true, place_id, status: updateStatus });
+          }
+        );
+      } else {
+        db.run(
+          `INSERT INTO saved_places (place_id, name, address, rating, user_ratings_total, website, analysis_json, status) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [place_id, name, address, rating, user_ratings_total, website, analysis_json, status || '未対応'],
+          function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true, place_id, status: status || '未対応' });
+          }
+        );
+      }
+    });
+  }
 });
 
 // API: 保存解除
 app.delete('/api/saved_places/:id', (req, res) => {
-  db.run('DELETE FROM saved_places WHERE place_id = ?', [req.params.id], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true, deleted: this.changes });
-  });
+  if (dbType === 'postgres') {
+    pgPool.query('DELETE FROM saved_places WHERE place_id = $1', [req.params.id], (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true });
+    });
+  } else {
+    db.run('DELETE FROM saved_places WHERE place_id = ?', [req.params.id], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true, deleted: this.changes });
+    });
+  }
 });
 
 // Serve static assets in production
