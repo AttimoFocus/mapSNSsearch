@@ -67,9 +67,9 @@ Webサイト: ${place.website || 'なし'}
   "summary": "1行での総評",
   "businessType": "個人経営" または "チェーン・系列店" または "不明",
   "sns": {
-    "instagram": { "exists": true/false, "followers": "階層", "update": "頻度階層", "notes": "一言メモ" },
-    "threads": { "exists": true/false, "followers": "階層", "update": "頻度階層", "notes": "一言メモ" },
-    "tiktok": { "exists": true/false, "followers": "階層", "update": "頻度階層", "notes": "一言メモ" }
+    "instagram": { "exists": true/false, "url": "特定したInstagramアカウントのURL（見つからない場合はnull）", "followers": "階層", "update": "頻度階層", "notes": "一言メモ" },
+    "threads": { "exists": true/false, "url": "特定したThreadsアカウントのURL（見つからない場合はnull）", "followers": "階層", "update": "頻度階層", "notes": "一言メモ" },
+    "tiktok": { "exists": true/false, "url": "特定したTikTokアカウントのURL（見つからない場合はnull）", "followers": "階層", "update": "頻度階層", "notes": "一言メモ" }
   },
   "strengths": ["強み1", "強み2"],
   "weaknesses": ["弱みや営業チャンスになり得る課題1", "課題2"],

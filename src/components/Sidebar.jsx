@@ -223,7 +223,7 @@ const Sidebar = ({ places, selectedPlace, setSelectedPlace, searchQuery, setSear
   };
 
   return (
-    <div className="w-96 h-full bg-white border-r border-slate-200 shadow-xl flex flex-col z-20">
+    <div className="w-full h-full bg-white border-r border-slate-200 shadow-xl flex flex-col z-20">
       
       {/* Header / Tabs */}
       <div className="p-6 bg-slate-900 text-white flex-shrink-0 relative">

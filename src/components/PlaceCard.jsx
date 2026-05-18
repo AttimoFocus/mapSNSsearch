@@ -126,7 +126,19 @@ const PlaceCard = ({ place, isSelected, onClick, analysisResult, isAnalyzing, on
                     <div className="flex items-center justify-between text-xs border-b border-slate-100 pb-2">
                       <div className="flex items-center gap-2">
                         <div className="p-1.5 bg-pink-100 text-pink-600 rounded-lg"><Instagram className="w-4 h-4" /></div>
-                        <span className="font-bold text-slate-700">Instagram</span>
+                        {analysisResult.sns?.instagram?.exists && analysisResult.sns.instagram.url ? (
+                          <a 
+                            href={analysisResult.sns.instagram.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="font-bold text-pink-600 hover:underline flex items-center gap-0.5"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            Instagram ↗
+                          </a>
+                        ) : (
+                          <span className="font-bold text-slate-700">Instagram</span>
+                        )}
                       </div>
                       {analysisResult.sns?.instagram?.exists ? (
                         <div className="text-right">
@@ -134,7 +146,18 @@ const PlaceCard = ({ place, isSelected, onClick, analysisResult, isAnalyzing, on
                           <p className="text-slate-500">🔄 {analysisResult.sns.instagram.update}</p>
                         </div>
                       ) : (
-                        <span className="text-slate-400 bg-slate-100 px-2 py-1 rounded">未確認 / なし</span>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-slate-400 bg-slate-100 px-2 py-0.5 rounded text-[10px]">未確認 / なし</span>
+                          <a 
+                            href={`https://www.google.com/search?q=${encodeURIComponent(`site:instagram.com ${place.name} ${place.formatted_address || ''}`)}`}
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-blue-600 hover:text-blue-700 hover:underline flex items-center font-bold"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            🔍 手動検索
+                          </a>
+                        </div>
                       )}
                     </div>
 
@@ -142,7 +165,19 @@ const PlaceCard = ({ place, isSelected, onClick, analysisResult, isAnalyzing, on
                     <div className="flex items-center justify-between text-xs border-b border-slate-100 pb-2">
                       <div className="flex items-center gap-2">
                         <div className="p-1.5 bg-black text-white rounded-lg"><Video className="w-4 h-4" /></div>
-                        <span className="font-bold text-slate-700">TikTok</span>
+                        {analysisResult.sns?.tiktok?.exists && analysisResult.sns.tiktok.url ? (
+                          <a 
+                            href={analysisResult.sns.tiktok.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="font-bold text-slate-800 hover:underline flex items-center gap-0.5"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            TikTok ↗
+                          </a>
+                        ) : (
+                          <span className="font-bold text-slate-700">TikTok</span>
+                        )}
                       </div>
                       {analysisResult.sns?.tiktok?.exists ? (
                         <div className="text-right">
@@ -150,7 +185,18 @@ const PlaceCard = ({ place, isSelected, onClick, analysisResult, isAnalyzing, on
                           <p className="text-slate-500">🔄 {analysisResult.sns.tiktok.update}</p>
                         </div>
                       ) : (
-                        <span className="text-slate-400 bg-slate-100 px-2 py-1 rounded">未確認 / なし</span>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-slate-400 bg-slate-100 px-2 py-0.5 rounded text-[10px]">未確認 / なし</span>
+                          <a 
+                            href={`https://www.google.com/search?q=${encodeURIComponent(`site:tiktok.com ${place.name} ${place.formatted_address || ''}`)}`}
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-blue-600 hover:text-blue-700 hover:underline flex items-center font-bold"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            🔍 手動検索
+                          </a>
+                        </div>
                       )}
                     </div>
 
@@ -158,7 +204,19 @@ const PlaceCard = ({ place, isSelected, onClick, analysisResult, isAnalyzing, on
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
                         <div className="p-1.5 bg-slate-800 text-white rounded-lg"><Smartphone className="w-4 h-4" /></div>
-                        <span className="font-bold text-slate-700">Threads</span>
+                        {analysisResult.sns?.threads?.exists && analysisResult.sns.threads.url ? (
+                          <a 
+                            href={analysisResult.sns.threads.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="font-bold text-slate-800 hover:underline flex items-center gap-0.5"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            Threads ↗
+                          </a>
+                        ) : (
+                          <span className="font-bold text-slate-700">Threads</span>
+                        )}
                       </div>
                       {analysisResult.sns?.threads?.exists ? (
                         <div className="text-right">
@@ -166,7 +224,18 @@ const PlaceCard = ({ place, isSelected, onClick, analysisResult, isAnalyzing, on
                           <p className="text-slate-500">🔄 {analysisResult.sns.threads.update}</p>
                         </div>
                       ) : (
-                        <span className="text-slate-400 bg-slate-100 px-2 py-1 rounded">未確認 / なし</span>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-slate-400 bg-slate-100 px-2 py-0.5 rounded text-[10px]">未確認 / なし</span>
+                          <a 
+                            href={`https://www.google.com/search?q=${encodeURIComponent(`site:threads.net ${place.name} ${place.formatted_address || ''}`)}`}
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-blue-600 hover:text-blue-700 hover:underline flex items-center font-bold"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            🔍 手動検索
+                          </a>
+                        </div>
                       )}
                     </div>
                   </div>

@@ -82,11 +82,32 @@ const SavedPlaceCard = ({ savedPlace, onStatusChange, onDelete }) => {
           )}
 
           <div className="space-y-2 mb-3">
-            {analysis.sns?.instagram?.exists && (
-              <div className="flex items-center text-xs text-pink-600 bg-pink-50 px-2 py-1 rounded">
-                <Instagram className="w-3 h-3 mr-1.5" />
-                <span>IG: {analysis.sns.instagram.followers}</span>
-              </div>
+            {analysis.sns?.instagram?.exists ? (
+              analysis.sns.instagram.url ? (
+                <a 
+                  href={analysis.sns.instagram.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="flex items-center text-xs text-pink-600 bg-pink-50 hover:bg-pink-100 hover:underline px-2 py-1 rounded transition-colors font-bold"
+                >
+                  <Instagram className="w-3 h-3 mr-1.5 flex-shrink-0" />
+                  <span className="truncate">IG: {analysis.sns.instagram.followers} ↗</span>
+                </a>
+              ) : (
+                <div className="flex items-center text-xs text-pink-600 bg-pink-50 px-2 py-1 rounded">
+                  <Instagram className="w-3 h-3 mr-1.5 flex-shrink-0" />
+                  <span className="truncate">IG: {analysis.sns.instagram.followers}</span>
+                </div>
+              )
+            ) : (
+              <a 
+                href={`https://www.google.com/search?q=${encodeURIComponent(`site:instagram.com ${name} ${address || ''}`)}`}
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1 text-[10px] text-blue-600 bg-blue-50 hover:bg-blue-100 hover:underline px-2 py-1 rounded transition-colors font-bold w-full"
+              >
+                🔍 インスタを手動検索
+              </a>
             )}
           </div>
           
