@@ -181,6 +181,13 @@ app.post('/api/saved_places', (req, res) => {
   const { place_id, name, address, rating, user_ratings_total, website, analysis, status } = req.body;
   const analysis_json = analysis ? JSON.stringify(analysis) : null;
 
+  // Sanitize values to replace 'undefined' with 'null' for PostgreSQL/SQLite compatibility
+  const clean_name = name !== undefined ? name : null;
+  const clean_address = address !== undefined ? address : null;
+  const clean_rating = rating !== undefined ? (rating !== null ? String(rating) : null) : null;
+  const clean_user_ratings_total = (user_ratings_total !== undefined && user_ratings_total !== null) ? Number(user_ratings_total) : null;
+  const clean_website = website !== undefined ? website : null;
+
   if (dbType === 'postgres') {
     pgPool.query('SELECT * FROM saved_places WHERE place_id = $1', [place_id], (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
@@ -201,7 +208,7 @@ app.post('/api/saved_places', (req, res) => {
         pgPool.query(
           `INSERT INTO saved_places (place_id, name, address, rating, user_ratings_total, website, analysis_json, status) 
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [place_id, name, address, rating, user_ratings_total, website, analysis_json, status || '未対応'],
+          [place_id, clean_name, clean_address, clean_rating, clean_user_ratings_total, clean_website, analysis_json, status || '未対応'],
           (err) => {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ success: true, place_id, status: status || '未対応' });
@@ -228,7 +235,7 @@ app.post('/api/saved_places', (req, res) => {
         db.run(
           `INSERT INTO saved_places (place_id, name, address, rating, user_ratings_total, website, analysis_json, status) 
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [place_id, name, address, rating, user_ratings_total, website, analysis_json, status || '未対応'],
+          [place_id, clean_name, clean_address, clean_rating, clean_user_ratings_total, clean_website, analysis_json, status || '未対応'],
           function(err) {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ success: true, place_id, status: status || '未対応' });

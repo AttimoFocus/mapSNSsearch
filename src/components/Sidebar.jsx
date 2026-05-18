@@ -99,6 +99,15 @@ const Sidebar = ({ places, selectedPlace, setSelectedPlace, searchQuery, setSear
     }
   };
 
+  const handleToggleSave = async (place) => {
+    const isCurrentlySaved = savedPlaceIds.has(place.place_id);
+    if (isCurrentlySaved) {
+      await handleDeleteSaved(place.place_id);
+    } else {
+      await handleSavePlace(place);
+    }
+  };
+
   const handleAnalyze = async (place) => {
     const existingResult = analysisResults[place.place_id];
     if ((existingResult && !existingResult.error) || analyzingPlaceId === place.place_id) return;
@@ -129,8 +138,10 @@ const Sidebar = ({ places, selectedPlace, setSelectedPlace, searchQuery, setSear
       if (response.ok) {
         const data = await response.json();
         setAnalysisResults(prev => ({ ...prev, [place.place_id]: data.analysis }));
-        // 自動的に保存
-        await handleSavePlace({ ...placeToSend, analysis: data.analysis });
+        // すでに保存リストに入っている場合のみ、データベースのレコードを最新の解析結果で更新する
+        if (savedPlaceIds.has(place.place_id)) {
+          await handleSavePlace({ ...placeToSend, analysis: data.analysis });
+        }
       } else {
         setAnalysisResults(prev => ({ ...prev, [place.place_id]: { error: true, message: 'AIが混み合っているため分析できませんでした。後ほど再度お試しください。' } }));
       }
@@ -330,7 +341,7 @@ const Sidebar = ({ places, selectedPlace, setSelectedPlace, searchQuery, setSear
                 analysisResult={analysisResults?.[place.place_id]}
                 isAnalyzing={analyzingPlaceId === place.place_id}
                 onAnalyzeClick={handleAnalyze}
-                onSave={() => handleSavePlace(place)}
+                onSave={() => handleToggleSave(place)}
                 isSaved={savedPlaceIds.has(place.place_id)}
               />
             ))}

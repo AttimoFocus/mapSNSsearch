@@ -42,7 +42,7 @@ const PlaceCard = ({ place, isSelected, onClick, analysisResult, isAnalyzing, on
           
           {/* Action Buttons */}
           <div className="ml-auto flex items-center gap-2">
-            {analysisResult && !analysisResult.error && onSave && (
+            {onSave && (
               <button
                 onClick={(e) => { e.stopPropagation(); onSave(); }}
                 className={`p-1.5 rounded-full transition-all ${
