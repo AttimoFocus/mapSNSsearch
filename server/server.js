@@ -135,6 +135,11 @@ app.post('/api/analyze', async (req, res) => {
       return res.status(400).json({ error: 'Place data is required' });
     }
 
+    // Extract clean Japanese address keyword (e.g. "東京都昭島市") to make search queries extremely accurate
+    const cleanAddress = place.formatted_address ? place.formatted_address.replace(/^日本、\s*〒\d{3}-\d{4}\s*/, '') : '';
+    const cityMatch = cleanAddress.match(/^([^\s市区町村]+[都府道県][^\s市区町村]+[市区町村])/);
+    const addressKeyword = cityMatch ? cityMatch[1] : (cleanAddress.split(/\s+/)[0] || '');
+
     const prompt = `
 あなたは優秀なリサーチャー・マーケターです。
 以下の店舗情報（Google Mapsデータ）とGoogle検索を活用して、この店舗が「SNS集客支援の営業ターゲット」として適しているかを分析し、スコアリングしてください。
@@ -148,7 +153,7 @@ Webサイト: ${place.website || 'なし'}
 
 【分析の必須要件】
 1. 経営形態: チェーン・系列店ではなく「個人経営（または小規模店舗）」であるかを判定してください。
-2. SNS運用状況の徹底調査: 提供された【Webサイト】の中を探すだけでなく、**必ずAIのGoogle検索機能を使って「site:instagram.com ${place.name} ${place.formatted_address ? place.formatted_address.split(' ')[0] : ''}」というキーワードで検索を実行**し、公式のInstagramアカウントを炙り出してください。TikTokやThreadsについても同様に「site:tiktok.com」「site:threads.net」をつけて検索し、見つかった場合は以下の情報を抽出してください。
+2. SNS運用状況の徹底調査: 提供された【Webサイト】の中を探すだけでなく、**必ずAIのGoogle検索機能を使って「site:instagram.com ${place.name} ${addressKeyword}」や「site:instagram.com ${place.name}」という複数の高確率なキーワードで検索を実行**し、公式のInstagramアカウントを炙り出してください。TikTokやThreadsについても同様に「site:tiktok.com」「site:threads.net」をつけて検索し、見つかった場合は以下の情報を抽出してください。
    - フォロワー数: 「100以内」「100〜500」「501〜800」「801〜1000」「1001以上」「不明」のいずれか
    - 更新頻度: 「1ヶ月以内」「3ヶ月以内」「6ヶ月以内」「6ヶ月以上放置」「不明」のいずれか
 
