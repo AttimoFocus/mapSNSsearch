@@ -168,6 +168,7 @@ const Sidebar = ({ places, selectedPlace, setSelectedPlace, searchQuery, setSear
   const handleBatchAnalyze = async () => {
     if (isBatchAnalyzing) return;
     setIsBatchAnalyzing(true);
+    isBatchAnalyzingRef.current = true; // Synchronously set to true to prevent state propagation lag from breaking the loop on first iteration
     
     const unanalyzedPlaces = places.filter(p => !analysisResults[p.place_id]);
     
@@ -183,6 +184,7 @@ const Sidebar = ({ places, selectedPlace, setSelectedPlace, searchQuery, setSear
     }
     
     setIsBatchAnalyzing(false);
+    isBatchAnalyzingRef.current = false;
   };
 
   const filteredPlaces = places.filter(place => {
