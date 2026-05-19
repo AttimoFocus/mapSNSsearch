@@ -45,14 +45,15 @@ const PlaceCard = ({ place, isSelected, onClick, analysisResult, isAnalyzing, on
             {onSave && (
               <button
                 onClick={(e) => { e.stopPropagation(); onSave(); }}
-                className={`p-1.5 rounded-full transition-all ${
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all hover:scale-105 active:scale-95 ${
                   isSaved 
-                    ? 'text-white bg-blue-600 shadow-sm' 
-                    : 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+                    ? 'text-white bg-blue-600 shadow-md hover:bg-blue-500' 
+                    : 'text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100'
                 }`}
-                title={isSaved ? "保存済み" : "お気に入り保存"}
+                title={isSaved ? "保存リストから削除" : "保存リストに追加"}
               >
-                <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
+                <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-current' : ''}`} />
+                <span>{isSaved ? "保存済" : "保存"}</span>
               </button>
             )}
             <button

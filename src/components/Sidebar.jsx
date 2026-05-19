@@ -108,7 +108,17 @@ const Sidebar = ({ places, selectedPlace, setSelectedPlace, searchQuery, setSear
   const handleToggleSave = async (place) => {
     const isCurrentlySaved = savedPlaceIds.has(place.place_id);
     if (isCurrentlySaved) {
-      await handleDeleteSaved(place.place_id);
+      try {
+        await fetch(`/api/saved_places/${place.place_id}`, { method: 'DELETE' });
+        setSavedPlaces(prev => prev.filter(p => p.place_id !== place.place_id));
+        setSavedPlaceIds(prev => {
+          const next = new Set(prev);
+          next.delete(place.place_id);
+          return next;
+        });
+      } catch (e) {
+        console.error("Failed to delete", e);
+      }
     } else {
       await handleSavePlace(place);
     }
