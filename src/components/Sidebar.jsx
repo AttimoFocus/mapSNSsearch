@@ -3,6 +3,7 @@ import { Search, Loader2, Filter, Zap, Bookmark, List } from 'lucide-react';
 import { useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
 import PlaceCard from './PlaceCard';
 import SavedPlaceCard from './SavedPlaceCard';
+import { UserButton, useAuth } from '@clerk/clerk-react';
 
 const Sidebar = ({ places, selectedPlace, setSelectedPlace, searchQuery, setSearchQuery, isSearching, analysisResults, setAnalysisResults, analyzingPlaceId, setAnalyzingPlaceId, filterType, setFilterType, isBatchAnalyzing, setIsBatchAnalyzing }) => {
   const map = useMap();
@@ -12,6 +13,7 @@ const Sidebar = ({ places, selectedPlace, setSelectedPlace, searchQuery, setSear
   const [savedPlaces, setSavedPlaces] = useState([]);
   const [savedPlaceIds, setSavedPlaceIds] = useState(new Set());
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
+  const { getToken } = useAuth();
 
   useEffect(() => {
     if (!placesLibrary || !map) return;
@@ -21,7 +23,10 @@ const Sidebar = ({ places, selectedPlace, setSelectedPlace, searchQuery, setSear
   const fetchSavedPlaces = async () => {
     setIsLoadingSaved(true);
     try {
-      const res = await fetch('/api/saved_places');
+      const token = await getToken();
+      const res = await fetch('/api/saved_places', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         setSavedPlaces(data);
@@ -50,9 +55,13 @@ const Sidebar = ({ places, selectedPlace, setSelectedPlace, searchQuery, setSear
       : null;
       
     try {
+      const token = await getToken();
       const response = await fetch('/api/saved_places', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           place_id: place.place_id,
           name: place.name,
@@ -79,9 +88,13 @@ const Sidebar = ({ places, selectedPlace, setSelectedPlace, searchQuery, setSear
 
   const handleUpdateStatus = async (place_id, status) => {
     try {
+      const token = await getToken();
       await fetch('/api/saved_places', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ place_id, status })
       });
       setSavedPlaces(prev => prev.map(p => p.place_id === place_id ? { ...p, status } : p));
@@ -93,7 +106,11 @@ const Sidebar = ({ places, selectedPlace, setSelectedPlace, searchQuery, setSear
   const handleDeleteSaved = async (place_id) => {
     if (!confirm('保存リストから削除しますか？')) return;
     try {
-      await fetch(`/api/saved_places/${place_id}`, { method: 'DELETE' });
+      const token = await getToken();
+      await fetch(`/api/saved_places/${place_id}`, { 
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       setSavedPlaces(prev => prev.filter(p => p.place_id !== place_id));
       setSavedPlaceIds(prev => {
         const next = new Set(prev);
@@ -256,9 +273,12 @@ const Sidebar = ({ places, selectedPlace, setSelectedPlace, searchQuery, setSear
       
       {/* Header / Tabs */}
       <div className="p-6 bg-slate-900 text-white flex-shrink-0 relative">
-        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <span className="text-blue-400">Target</span>Search
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <span className="text-blue-400">Target</span>Search
+          </h2>
+          <UserButton afterSignOutUrl="/" />
+        </div>
 
         <div className="flex bg-slate-800 p-1 rounded-xl mb-4">
           <button 

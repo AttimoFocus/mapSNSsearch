@@ -14,6 +14,8 @@
     "postinstall": "npm rebuild sqlite3 --build-from-source"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.61.8",
+    "@clerk/clerk-sdk-node": "^4.13.23",
     "@google/genai": "^2.3.0",
     "@vis.gl/react-google-maps": "^1.4.0",
     "cors": "^2.8.5",

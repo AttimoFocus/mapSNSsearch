@@ -6,6 +6,7 @@ import sqlite3 from 'sqlite3';
 import pg from 'pg';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { ClerkExpressRequireAuth } from '@clerk/clerk-sdk-node';
 
 dotenv.config();
 
@@ -31,9 +32,11 @@ if (process.env.DATABASE_URL) {
     ssl: { rejectUnauthorized: false } // Required for Neon/Supabase SSL connections
   });
   
+  // Try to create the table with the new schema (if it doesn't exist)
   pgPool.query(`
     CREATE TABLE IF NOT EXISTS saved_places (
-      place_id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      place_id TEXT NOT NULL,
       name TEXT,
       address TEXT,
       rating TEXT,
@@ -41,10 +44,20 @@ if (process.env.DATABASE_URL) {
       website TEXT,
       analysis_json TEXT,
       status TEXT DEFAULT '未対応',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, place_id)
     )
-  `).then(() => {
-    console.log('PostgreSQL table verified/created.');
+  `).then(async () => {
+    // Attempt migration for existing legacy table
+    try {
+      await pgPool.query(`ALTER TABLE saved_places ADD COLUMN user_id TEXT DEFAULT 'legacy';`);
+      await pgPool.query(`ALTER TABLE saved_places DROP CONSTRAINT saved_places_pkey;`);
+      await pgPool.query(`ALTER TABLE saved_places ADD PRIMARY KEY (user_id, place_id);`);
+      console.log('PostgreSQL legacy table migrated to multi-tenant.');
+    } catch (e) {
+      // Ignore migration errors (column already exists, etc.)
+    }
+    console.log('PostgreSQL table verified.');
   }).catch((err) => {
     console.error('Error creating PostgreSQL table', err.message);
   });
@@ -55,7 +68,8 @@ if (process.env.DATABASE_URL) {
       console.error('Error opening database', err.message);
     } else {
       db.run(`CREATE TABLE IF NOT EXISTS saved_places (
-        place_id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        place_id TEXT NOT NULL,
         name TEXT,
         address TEXT,
         rating TEXT,
@@ -63,8 +77,10 @@ if (process.env.DATABASE_URL) {
         website TEXT,
         analysis_json TEXT,
         status TEXT DEFAULT '未対応',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, place_id)
       )`);
+      // Ignore SQLite migrations for now as it's for local dev only and ALTER TABLE is limited in SQLite
     }
   });
 }
@@ -211,9 +227,11 @@ Webサイト: ${place.website || 'なし'}
 });
 
 // API: 保存済みリストの取得
-app.get('/api/saved_places', (req, res) => {
+app.get('/api/saved_places', ClerkExpressRequireAuth(), (req, res) => {
+  const userId = req.auth.userId;
+  
   if (dbType === 'postgres') {
-    pgPool.query('SELECT * FROM saved_places ORDER BY created_at DESC', (err, result) => {
+    pgPool.query('SELECT * FROM saved_places WHERE user_id = $1 ORDER BY created_at DESC', [userId], (err, result) => {
       if (err) {
         res.status(500).json({ error: err.message });
         return;
@@ -225,7 +243,7 @@ app.get('/api/saved_places', (req, res) => {
       res.json(places);
     });
   } else {
-    db.all('SELECT * FROM saved_places ORDER BY created_at DESC', [], (err, rows) => {
+    db.all('SELECT * FROM saved_places WHERE user_id = ? ORDER BY created_at DESC', [userId], (err, rows) => {
       if (err) {
         res.status(500).json({ error: err.message });
         return;
@@ -240,7 +258,8 @@ app.get('/api/saved_places', (req, res) => {
 });
 
 // API: お気に入り保存 / ステータス更新
-app.post('/api/saved_places', (req, res) => {
+app.post('/api/saved_places', ClerkExpressRequireAuth(), (req, res) => {
+  const userId = req.auth.userId;
   const { place_id, name, address, rating, user_ratings_total, website, analysis, status } = req.body;
   const analysis_json = analysis ? JSON.stringify(analysis) : null;
 
@@ -252,7 +271,7 @@ app.post('/api/saved_places', (req, res) => {
   const clean_website = website !== undefined ? website : null;
 
   if (dbType === 'postgres') {
-    pgPool.query('SELECT * FROM saved_places WHERE place_id = $1', [place_id], (err, result) => {
+    pgPool.query('SELECT * FROM saved_places WHERE user_id = $1 AND place_id = $2', [userId, place_id], (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
       const row = result.rows[0];
 
@@ -260,8 +279,8 @@ app.post('/api/saved_places', (req, res) => {
         const updateStatus = status || row.status;
         const updateAnalysis = analysis_json || row.analysis_json;
         pgPool.query(
-          'UPDATE saved_places SET status = $1, analysis_json = $2 WHERE place_id = $3',
-          [updateStatus, updateAnalysis, place_id],
+          'UPDATE saved_places SET status = $1, analysis_json = $2 WHERE user_id = $3 AND place_id = $4',
+          [updateStatus, updateAnalysis, userId, place_id],
           (err) => {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ success: true, place_id, status: updateStatus });
@@ -269,9 +288,9 @@ app.post('/api/saved_places', (req, res) => {
         );
       } else {
         pgPool.query(
-          `INSERT INTO saved_places (place_id, name, address, rating, user_ratings_total, website, analysis_json, status) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [place_id, clean_name, clean_address, clean_rating, clean_user_ratings_total, clean_website, analysis_json, status || '未対応'],
+          `INSERT INTO saved_places (user_id, place_id, name, address, rating, user_ratings_total, website, analysis_json, status) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [userId, place_id, clean_name, clean_address, clean_rating, clean_user_ratings_total, clean_website, analysis_json, status || '未対応'],
           (err) => {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ success: true, place_id, status: status || '未対応' });
@@ -280,15 +299,15 @@ app.post('/api/saved_places', (req, res) => {
       }
     });
   } else {
-    db.get('SELECT * FROM saved_places WHERE place_id = ?', [place_id], (err, row) => {
+    db.get('SELECT * FROM saved_places WHERE user_id = ? AND place_id = ?', [userId, place_id], (err, row) => {
       if (err) return res.status(500).json({ error: err.message });
 
       if (row) {
         const updateStatus = status || row.status;
         const updateAnalysis = analysis_json || row.analysis_json;
         db.run(
-          'UPDATE saved_places SET status = ?, analysis_json = ? WHERE place_id = ?',
-          [updateStatus, updateAnalysis, place_id],
+          'UPDATE saved_places SET status = ?, analysis_json = ? WHERE user_id = ? AND place_id = ?',
+          [updateStatus, updateAnalysis, userId, place_id],
           function(err) {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ success: true, place_id, status: updateStatus });
@@ -296,9 +315,9 @@ app.post('/api/saved_places', (req, res) => {
         );
       } else {
         db.run(
-          `INSERT INTO saved_places (place_id, name, address, rating, user_ratings_total, website, analysis_json, status) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [place_id, clean_name, clean_address, clean_rating, clean_user_ratings_total, clean_website, analysis_json, status || '未対応'],
+          `INSERT INTO saved_places (user_id, place_id, name, address, rating, user_ratings_total, website, analysis_json, status) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [userId, place_id, clean_name, clean_address, clean_rating, clean_user_ratings_total, clean_website, analysis_json, status || '未対応'],
           function(err) {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ success: true, place_id, status: status || '未対応' });
@@ -310,14 +329,17 @@ app.post('/api/saved_places', (req, res) => {
 });
 
 // API: 保存解除
-app.delete('/api/saved_places/:id', (req, res) => {
+app.delete('/api/saved_places/:id', ClerkExpressRequireAuth(), (req, res) => {
+  const userId = req.auth.userId;
+  const place_id = req.params.id;
+
   if (dbType === 'postgres') {
-    pgPool.query('DELETE FROM saved_places WHERE place_id = $1', [req.params.id], (err) => {
+    pgPool.query('DELETE FROM saved_places WHERE user_id = $1 AND place_id = $2', [userId, place_id], (err) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json({ success: true });
     });
   } else {
-    db.run('DELETE FROM saved_places WHERE place_id = ?', [req.params.id], function(err) {
+    db.run('DELETE FROM saved_places WHERE user_id = ? AND place_id = ?', [userId, place_id], function(err) {
       if (err) return res.status(500).json({ error: err.message });
       res.json({ success: true, deleted: this.changes });
     });
