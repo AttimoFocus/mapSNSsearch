@@ -72,20 +72,6 @@ const MapComponent = ({ places, setPlaces, selectedPlace, setSelectedPlace, sear
     setAnalyzingPlaceId(place.place_id);
     try {
       let placeToSend = place;
-      if (placesService) {
-        placeToSend = await new Promise((resolve) => {
-          placesService.getDetails({
-            placeId: place.place_id,
-            fields: ['name', 'formatted_address', 'rating', 'user_ratings_total', 'types', 'website', 'formatted_phone_number', 'url']
-          }, (result, status) => {
-            if (status === placesLibrary.PlacesServiceStatus.OK && result) {
-              resolve({ ...place, ...result });
-            } else {
-              resolve(place);
-            }
-          });
-        });
-      }
 
       const response = await fetch('/api/analyze', {
         method: 'POST',
